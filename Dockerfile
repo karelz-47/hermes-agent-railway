@@ -1,6 +1,9 @@
-FROM ghcr.io/astral-sh/uv:0.11.6-python3.13-trixie-slim
+FROM node:26.12.1-trixie-slim AS node26
 
-ARG HERMES_REF=v2026.6.5
+FROM ghcr.io/astral-sh/uv:0.13.9-python3.14-trixie-slim
+COPY --from=node26 /usr/local/ /usr/local/
+
+ARG HERMES_REF=v0.23.3
 ARG HERMES_WEBUI_REF=v0.51.310
 
 ENV PYTHONUNBUFFERED=1 \
@@ -22,8 +25,6 @@ RUN apt-get update && \
       git \
       gosu \
       libffi-dev \
-      nodejs \
-      npm \
       openssh-client \
       procps \
       python3 \
@@ -39,6 +40,10 @@ RUN apt-get update && \
       unzip \
       wget && \
     rm -rf /var/lib/apt/lists/*
+
+RUN npm install --global pnpm@12.15.0 && \
+    node --version && \
+    pnpm --version
 
 # Railway's Trial and Free plans reject images over 4 GB. Keep this image well under it:
 # the app directories are owned by `hermes` before anything is written into them, and
@@ -58,16 +63,12 @@ RUN git init . && \
     (git fetch --depth 1 origin "${HERMES_REF}" || git fetch --depth 1 origin "refs/tags/${HERMES_REF}:refs/tags/${HERMES_REF}") && \
     git checkout --detach FETCH_HEAD
 
-ENV npm_config_install_links=false
-
-# Root dependencies (agent-browser) plus the web dashboard and TUI workspaces, which
-# Hermes builds with npm on first use. The apps/* workspaces are skipped: they are the
-# Electron desktop app and its installers (about 600 MB), used only by `hermes desktop`.
-RUN npm install --prefer-offline --no-audit --include-workspace-root \
-      --workspace web \
-      --workspace ui-tui \
-      --workspace ui-tui/packages/hermes-ink && \
-    npm cache clean --force && \
+# Install Hermes root, Web and TUI dependencies with pnpm.
+# Exclude the Electron desktop application.
+RUN pnpm install --frozen-lockfile --trust-lockfile --prod=false \
+      --filter "{./web}..." \
+      --filter "{./ui-tui}..." && \
+    pnpm store prune && \
     rm -rf /home/hermes/.cache
 
 # Chromium's system libraries need root; the browser itself goes to
