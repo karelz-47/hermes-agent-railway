@@ -4,7 +4,7 @@ FROM ghcr.io/astral-sh/uv:0.13.9-python3.14-trixie-slim
 COPY --from=node26 /usr/local/ /usr/local/
 
 ARG HERMES_REF=v0.23.3
-ARG HERMES_WEBUI_REF=v0.51.310
+ARG HERMES_WEBUI_REF=v0.52.732
 
 ENV PYTHONUNBUFFERED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright \
